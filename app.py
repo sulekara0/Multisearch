@@ -88,7 +88,7 @@ index, metric, paths = load_index_and_ids()
 
 col1, col2 = st.columns([4,1])
 with col1:
-    q = st.text_input("Metin sorgusu gir (örn. 'deniz kenarında kırmızı araba')", "")
+    q = st.text_input("Metin sorgusu gir", "")
 with col2:
     topk = st.slider("Top-K", 4, 24, 12, step=4)
 

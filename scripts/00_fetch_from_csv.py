@@ -8,7 +8,7 @@ from io import BytesIO
 CSV_PATH = "data/train.csv"                         # CSV burada
 OUT_DIR = Path("data/images")                       # Görseller buraya inecek
 META_OUT = Path("artifacts/captions_coco.jsonl")    # path+caption logu
-MAX_NUM = 1000
+MAX_NUM = 50000
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 META_OUT.parent.mkdir(parents=True, exist_ok=True)
