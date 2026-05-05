@@ -1,0 +1,22 @@
+# Core ML
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Embedding models
+transformers>=4.36.0          # Generic CLIP için
+open_clip_torch>=2.24.0       # QuiltNet, BiomedCLIP gibi domain-specific modeller için
+
+# Vector search
+faiss-cpu>=1.7.4              # GPU varsa: faiss-gpu
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0                 # Quilt-1M CSV parsing için
+Pillow>=10.0.0
+tqdm>=4.65.0
+
+# UI
+streamlit>=1.28.0
+
+# Utilities
+requests>=2.31.0              # Eski indirme scriptleri için (opsiyonel)

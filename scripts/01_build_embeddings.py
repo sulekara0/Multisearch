@@ -1,115 +1,138 @@
-import argparse
-import json
-from pathlib import Path
-from typing import List, Tuple
-
+import os, sys, json, time, argparse
 import numpy as np
-import torch
-from PIL import Image, ImageFile
+from pathlib import Path
+from PIL import Image
+from datetime import datetime
 from tqdm import tqdm
-from transformers import CLIPModel, CLIPProcessor
+import torch
 
-# Bozuk/truncated görselleri mümkünse açabilmek için
-ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-@torch.inference_mode()
-def load_clip(model_name: str = "openai/clip-vit-base-patch32", device: str | None = None):
-    if device is None:
-        if torch.cuda.is_available():
-            device = "cuda"
-        elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-            device = "mps"
-        else:
-            device = "cpu"
-    model = CLIPModel.from_pretrained(model_name).to(device).eval()
-    processor = CLIPProcessor.from_pretrained(model_name)
-    return model, processor, device
+IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
-def gather_image_paths(images_dir: Path) -> List[Path]:
-    exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-    paths = [p for p in images_dir.rglob("*") if p.suffix.lower() in exts]
-    paths.sort()
-    if not paths:
-        raise FileNotFoundError(f"{images_dir} içinde desteklenen uzantılarda görsel bulunamadı.")
-    return paths
+def iter_images(img_dir, allowed=None):
+    for root, _, files in os.walk(img_dir):
+        for f in files:
+            if Path(f).suffix.lower() in IMG_EXTS:
+                if allowed is None or f in allowed:
+                    yield os.path.join(root, f)
 
 
-@torch.inference_mode()
-def build_image_embeddings(
-    images_dir: Path,
-    out_dir: Path,
-    model: CLIPModel,
-    processor: CLIPProcessor,
-    device: str,
-    batch_size: int = 32,
-    use_relative_ids: bool = True,
-) -> Tuple[np.ndarray, list[str]]:
-    out_dir.mkdir(parents=True, exist_ok=True)
+def load_allowed_filenames(jsonl_path):
+    allowed = set()
+    with open(jsonl_path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            # Sırasıyla dene: bizim format (path), sonra alternatifler
+            raw = rec.get("path") or rec.get("file_name") or rec.get("filename")
+            if raw:
+                allowed.add(os.path.basename(raw))
+    return allowed
 
-    img_paths = gather_image_paths(images_dir)
-    all_embeds: list[torch.Tensor] = []
-    all_ids: list[str] = []
 
-    for i in tqdm(range(0, len(img_paths), batch_size), desc="Embedding (image)"):
-        batch_paths = img_paths[i : i + batch_size]
-        images = []
-        kept_paths = []
-        for p in batch_paths:
+def process_batch(encoder, batch_pils, batch_paths, all_embs, all_ids):
+    try:
+        embs = encoder.encode_images(batch_pils)
+        all_embs.append(embs)
+        all_ids.extend([os.path.basename(p) for p in batch_paths])
+    except torch.cuda.OutOfMemoryError:
+        sys.exit(
+            "\n[HATA] GPU belleği yetersiz (OutOfMemoryError).\n"
+            "  → --batch_size değerini düşürün (örn. --batch_size 16 veya --batch_size 8)\n"
+            "  → Çıkış yapılıyor."
+        )
+    except Exception:
+        for img, path in zip(batch_pils, batch_paths):
             try:
-                img = Image.open(p).convert("RGB")
-                images.append(img)
-                kept_paths.append(p)
+                emb = encoder.encode_images([img])
+                all_embs.append(emb)
+                all_ids.append(os.path.basename(path))
             except Exception as e:
-                print(f"[WARN] Skipping unreadable image: {p} ({e})")
-        if not images:
-            continue
-        inputs = processor(images=images, return_tensors="pt", padding=True).to(device)
-        feats = model.get_image_features(**inputs)
-        feats = torch.nn.functional.normalize(feats, p=2, dim=1)
-        all_embeds.append(feats.cpu())
-        if use_relative_ids:
-            all_ids.extend([str(p.relative_to(images_dir)) for p in kept_paths])
-        else:
-            all_ids.extend([p.name for p in kept_paths])
-
-    if not all_embeds:
-        raise RuntimeError("Hiçbir görsel işlenemedi; görüntü yollarını kontrol edin.")
-
-    emb = torch.cat(all_embeds, dim=0).numpy()
-    np.save(out_dir / "embeddings.npy", emb)
-    with open(out_dir / "ids.json", "w", encoding="utf-8") as f:
-        json.dump(all_ids, f, ensure_ascii=False, indent=2)
-
-    print(f"[INFO] embeddings shape: {emb.shape} | ids: {len(all_ids)}")
-    return emb, all_ids
-
-
-def parse_args():
-    ap = argparse.ArgumentParser(description="CLIP ile görsel embedding üretimi")
-    ap.add_argument("images_dir", type=str, help="Görsellerin bulunduğu klasör (alt klasörler dahil)")
-    ap.add_argument("out_dir", type=str, help="Çıktı klasörü (embeddings.npy, ids.json)")
-    ap.add_argument("--model", type=str, default="openai/clip-vit-base-patch32")
-    ap.add_argument("--batch_size", type=int, default=32)
-    ap.add_argument("--device", type=str, default=None, choices=[None, "cpu", "cuda", "mps"])
-    ap.add_argument("--abs_ids", action="store_true", help="ID olarak göreli yol yerine sadece dosya adını yaz")
-    return ap.parse_args()
+                print(f"[WARN] Atlandi: {path} - {e}")
 
 
 def main():
-    args = parse_args()
-    images_dir = Path(args.images_dir)
-    out_dir = Path(args.out_dir)
+    parser = argparse.ArgumentParser(description="Quilt-1M görsel embedding üretici")
+    parser.add_argument("--img_dir", default="data/images")
+    parser.add_argument("--out_dir", default="artifacts")
+    parser.add_argument(
+        "--encoder",
+        default=os.environ.get("ENCODER", "clip"),
+        help="Encoder adı: clip | clip-b16 | quilt  (veya ENCODER env var)",
+    )
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument(
+        "--captions_jsonl",
+        default=None,
+        help="Opsiyonel: sadece bu JSONL'da geçen görselleri işle (filename match)",
+    )
+    args = parser.parse_args()
 
-    model, processor, device = load_clip(args.model, args.device)
-    build_image_embeddings(
-        images_dir,
-        out_dir,
-        model,
-        processor,
-        device,
-        batch_size=args.batch_size,
-        use_relative_ids=not args.abs_ids,
+    sys.path.insert(0, str(Path(__file__).parent))
+    from encoders import get_encoder  # noqa: PLC0415
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    allowed = None
+    if args.captions_jsonl:
+        allowed = load_allowed_filenames(args.captions_jsonl)
+        print(f"Filtre aktif: {len(allowed)} benzersiz dosya adı yüklendi.")
+
+    encoder = get_encoder(args.encoder, device=None)
+    print(f"Encoder: {encoder.name} | dim={encoder.embed_dim} | device={encoder.device}")
+
+    paths = list(iter_images(args.img_dir, allowed))
+    if not paths:
+        sys.exit(f"[HATA] {args.img_dir} altında görsel bulunamadı.")
+    print(f"İşlenecek görsel sayısı: {len(paths)}")
+
+    all_embs, all_ids = [], []
+    t0 = time.time()
+
+    batch_pils, batch_paths = [], []
+    for p in tqdm(paths, desc="Embedding"):
+        try:
+            img = Image.open(p).convert("RGB")
+        except Exception as e:
+            print(f"[WARN] Acilamadi: {p} - {e}")
+            continue
+        batch_pils.append(img)
+        batch_paths.append(p)
+        if len(batch_pils) == args.batch_size:
+            process_batch(encoder, batch_pils, batch_paths, all_embs, all_ids)
+            batch_pils, batch_paths = [], []
+
+    if batch_pils:
+        process_batch(encoder, batch_pils, batch_paths, all_embs, all_ids)
+
+    if not all_embs:
+        sys.exit("[HATA] Hiçbir embedding üretilemedi.")
+
+    duration = time.time() - t0
+    embeddings = np.vstack(all_embs).astype("float32")
+
+    np.save(os.path.join(args.out_dir, "embeddings.npy"), embeddings)
+
+    with open(os.path.join(args.out_dir, "ids.json"), "w", encoding="utf-8") as f:
+        json.dump(all_ids, f, ensure_ascii=False, indent=2)
+
+    model_info = {
+        "name": encoder.name,
+        "embed_dim": encoder.embed_dim,
+        "device": encoder.device,
+        "n_images": len(all_ids),
+        "batch_size": args.batch_size,
+        "duration_seconds": round(duration, 2),
+        "creation_time": datetime.now().isoformat(timespec="seconds"),
+    }
+    with open(os.path.join(args.out_dir, "model_info.json"), "w", encoding="utf-8") as f:
+        json.dump(model_info, f, indent=2)
+
+    print(
+        f"\n[OK] Kaydedildi: {embeddings.shape} | "
+        f"{len(all_ids)} gorsel | {duration:.1f}s | {args.out_dir}/"
     )
 
 
