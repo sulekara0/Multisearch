@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histopathology Search &mdash; Benchmark Comparison V1/V2/V3</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+             margin:0; padding:0; background:#f5f6fa; color:#2c3e50; }
+    .container { max-width:1200px; margin:0 auto; padding:32px 24px; }
+    h1 { font-size:26px; font-weight:800; margin:0 0 4px; }
+    h2 { font-size:18px; font-weight:700; margin:28px 0 12px; border-left:4px solid #3498db;
+           padding-left:12px; }
+    .subtitle { color:#666; font-size:14px; margin-bottom:28px; }
+    .card { background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.08);
+              padding:24px; margin-bottom:24px; }
+    .winner-badge { display:inline-block;padding:6px 16px;border-radius:20px;
+                     background:#27ae60;color:#fff;font-weight:700;font-size:13px;
+                     margin-bottom:16px; }
+    table tr:nth-child(even) { background:#fafafa; }
+    table td, table th { border-bottom:1px solid #eee; }
+    .note { font-size:11px; color:#888; margin-top:8px; }
+    .metric-note { background:#eaf4fb; border-left:4px solid #3498db; padding:10px 14px;
+                    border-radius:4px; font-size:12px; color:#2c3e50; margin-top:16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Histopathology Image Search &mdash; Benchmark Comparison</h1>
+    <div class="subtitle">QuiltNet-B-32 vs CLIP ViT-B/32 &nbsp;&bull;&nbsp;
+      FAISS IndexFlatIP (cosine similarity) &nbsp;&bull;&nbsp;
+      Corpus: 64,052 images (Quilt-1M) &nbsp;&bull;&nbsp;
+      Generated 2026-05-22
+    </div>
+
+    <!-- Config overview -->
+    <div class="card">
+      <h2 style="margin-top:0;">Configurations</h2>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        
+        <div style="background:#fff;border:2px solid #e74c3c;border-radius:10px;
+                    padding:16px 20px;flex:1;min-width:200px;">
+          <div style="font-size:22px;font-weight:800;color:#e74c3c;">V1</div>
+          <div style="font-size:14px;font-weight:600;margin:4px 0 8px;">Baseline</div>
+          <div style="font-size:11px;color:#666;line-height:1.5;">Original 63 queries &bull; No unknown filter &bull; Single query per concept</div>
+          <div style="margin-top:10px;font-size:16px;font-weight:700;color:#e74c3c;">
+            QuiltNet P@10 = 0.395
+          </div>
+        </div>
+        <div style="background:#fff;border:2px solid #f39c12;border-radius:10px;
+                    padding:16px 20px;flex:1;min-width:200px;">
+          <div style="font-size:22px;font-weight:800;color:#f39c12;">V2</div>
+          <div style="font-size:14px;font-weight:600;margin:4px 0 8px;">Better queries + unknown filter</div>
+          <div style="font-size:11px;color:#666;line-height:1.5;">90 domain-specific queries &bull; Unknown images filtered &bull; Single query per concept</div>
+          <div style="margin-top:10px;font-size:16px;font-weight:700;color:#f39c12;">
+            QuiltNet P@10 = 0.457
+          </div>
+        </div>
+        <div style="background:#fff;border:2px solid #27ae60;border-radius:10px;
+                    padding:16px 20px;flex:1;min-width:200px;">
+          <div style="font-size:22px;font-weight:800;color:#27ae60;">V3</div>
+          <div style="font-size:14px;font-weight:600;margin:4px 0 8px;">Multi-query RRF ensemble + filter</div>
+          <div style="font-size:11px;color:#666;line-height:1.5;">56 concepts &times; 3 query variants &bull; RRF fusion (k=60) &bull; Unknown images filtered</div>
+          <div style="margin-top:10px;font-size:16px;font-weight:700;color:#27ae60;">
+            QuiltNet P@10 = 0.480
+          </div>
+        </div>
+      </div>
+      <div class="metric-note">
+        <b>Note:</b> V1 uses 63 queries, V2 uses 90 queries, V3 uses 56 concepts (&#215;3 query variants via RRF).
+        Precision@10 values are not directly comparable across configs due to different query sets and concept counts &mdash;
+        use the per-category breakdown for a fair per-domain view.
+        Best overall configuration: <b>V3</b> (QuiltNet Precision@10).
+      </div>
+    </div>
+
+    <!-- Aggregate metrics -->
+    <div class="card">
+      <h2 style="margin-top:0;">Aggregate Metrics</h2>
+      
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#343a40;color:#fff;">
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Configuration</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">Precision@10</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">mAP@10</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">nDCG@10</th>
+          <th style="padding:10px 12px;text-align:left;font-weight:600;">&#916; vs V1</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr style="background:#f8f9fa;">
+          <td colspan="5" style="padding:8px 12px;font-size:13px;font-weight:700;color:#8e44ad;
+                                  border-bottom:2px solid #dee2e6;">QuiltNet-B-32</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;">
+            <span style="display:inline-block;padding:3px 8px;border-radius:4px;
+                         background:#fadbd8;color:#e74c3c;
+                         font-weight:700;font-size:12px;">V1</span>
+            &nbsp; Baseline
+            <div style="font-size:11px;color:#888;margin-top:2px;">63 queries / concepts</div>
+          </td>
+          <td style="padding:10px 12px;"><div style="display:inline-flex;align-items:center;gap:6px;"><div style="width:160px;height:14px;background:#eee;border-radius:7px;overflow:hidden;"><div style="width:63px;height:100%;background:#e74c3c;border-radius:7px;"></div></div><span style="font-size:12px;font-weight:600;color:#333;">0.395</span></div></td>
+          <td style="padding:10px 12px;font-size:12px;">0.520</td>
+          <td style="padding:10px 12px;font-size:12px;">0.410</td>
+          <td style="padding:10px 12px;"><span style="color:#888;font-size:11px;">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;">
+            <span style="display:inline-block;padding:3px 8px;border-radius:4px;
+                         background:#fdebd0;color:#f39c12;
+                         font-weight:700;font-size:12px;">V2</span>
+            &nbsp; Better queries + unknown filter
+            <div style="font-size:11px;color:#888;margin-top:2px;">90 queries / concepts</div>
+          </td>
+          <td style="padding:10px 12px;"><div style="display:inline-flex;align-items:center;gap:6px;"><div style="width:160px;height:14px;background:#eee;border-radius:7px;overflow:hidden;"><div style="width:73px;height:100%;background:#f39c12;border-radius:7px;"></div></div><span style="font-size:12px;font-weight:600;color:#333;">0.457</span></div></td>
+          <td style="padding:10px 12px;font-size:12px;">0.573</td>
+          <td style="padding:10px 12px;font-size:12px;">0.473</td>
+          <td style="padding:10px 12px;"><span style="color:#27ae60;font-size:11px;font-weight:700;">+0.061</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;">
+            <span style="display:inline-block;padding:3px 8px;border-radius:4px;
+                         background:#d5f5e3;color:#27ae60;
+                         font-weight:700;font-size:12px;">V3</span>
+            &nbsp; Multi-query RRF ensemble + filter &#9733;
+            <div style="font-size:11px;color:#888;margin-top:2px;">56 queries / concepts</div>
+          </td>
+          <td style="padding:10px 12px;"><div style="display:inline-flex;align-items:center;gap:6px;"><div style="width:160px;height:14px;background:#eee;border-radius:7px;overflow:hidden;"><div style="width:76px;height:100%;background:#27ae60;border-radius:7px;"></div></div><span style="font-size:12px;font-weight:600;color:#333;">0.480</span></div></td>
+          <td style="padding:10px 12px;font-size:12px;">0.585</td>
+          <td style="padding:10px 12px;font-size:12px;">0.489</td>
+          <td style="padding:10px 12px;"><span style="color:#27ae60;font-size:11px;font-weight:700;">+0.085</span></td>
+        </tr>
+        <tr style="background:#f8f9fa;">
+          <td colspan="5" style="padding:8px 12px;font-size:13px;font-weight:700;color:#2980b9;
+                                  border-bottom:2px solid #dee2e6;">CLIP ViT-B/32</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;">
+            <span style="display:inline-block;padding:3px 8px;border-radius:4px;
+                         background:#fadbd8;color:#e74c3c;
+                         font-weight:700;font-size:12px;">V1</span>
+            &nbsp; Baseline
+            <div style="font-size:11px;color:#888;margin-top:2px;">63 queries / concepts</div>
+          </td>
+          <td style="padding:10px 12px;"><div style="display:inline-flex;align-items:center;gap:6px;"><div style="width:160px;height:14px;background:#eee;border-radius:7px;overflow:hidden;"><div style="width:27px;height:100%;background:#e74c3c;border-radius:7px;"></div></div><span style="font-size:12px;font-weight:600;color:#333;">0.175</span></div></td>
+          <td style="padding:10px 12px;font-size:12px;">0.272</td>
+          <td style="padding:10px 12px;font-size:12px;">0.172</td>
+          <td style="padding:10px 12px;"><span style="color:#888;font-size:11px;">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;">
+            <span style="display:inline-block;padding:3px 8px;border-radius:4px;
+                         background:#fdebd0;color:#f39c12;
+                         font-weight:700;font-size:12px;">V2</span>
+            &nbsp; Better queries + unknown filter
+            <div style="font-size:11px;color:#888;margin-top:2px;">90 queries / concepts</div>
+          </td>
+          <td style="padding:10px 12px;"><div style="display:inline-flex;align-items:center;gap:6px;"><div style="width:160px;height:14px;background:#eee;border-radius:7px;overflow:hidden;"><div style="width:34px;height:100%;background:#f39c12;border-radius:7px;"></div></div><span style="font-size:12px;font-weight:600;color:#333;">0.216</span></div></td>
+          <td style="padding:10px 12px;font-size:12px;">0.449</td>
+          <td style="padding:10px 12px;font-size:12px;">0.246</td>
+          <td style="padding:10px 12px;"><span style="color:#27ae60;font-size:11px;font-weight:700;">+0.041</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;">
+            <span style="display:inline-block;padding:3px 8px;border-radius:4px;
+                         background:#d5f5e3;color:#27ae60;
+                         font-weight:700;font-size:12px;">V3</span>
+            &nbsp; Multi-query RRF ensemble + filter &#9733;
+            <div style="font-size:11px;color:#888;margin-top:2px;">56 queries / concepts</div>
+          </td>
+          <td style="padding:10px 12px;"><div style="display:inline-flex;align-items:center;gap:6px;"><div style="width:160px;height:14px;background:#eee;border-radius:7px;overflow:hidden;"><div style="width:36px;height:100%;background:#27ae60;border-radius:7px;"></div></div><span style="font-size:12px;font-weight:600;color:#333;">0.230</span></div></td>
+          <td style="padding:10px 12px;font-size:12px;">0.417</td>
+          <td style="padding:10px 12px;font-size:12px;">0.246</td>
+          <td style="padding:10px 12px;"><span style="color:#27ae60;font-size:11px;font-weight:700;">+0.056</span></td>
+        </tr>
+      </tbody>
+    </table>
+      <div class="note">* nDCG IDCG computed assuming &ge;K relevant documents exist per category (valid for large-corpus categories).</div>
+    </div>
+
+    <!-- Per-category comparison -->
+    <div class="card">
+      <h2 style="margin-top:0;">Per-Category Precision@10</h2>
+      <p style="font-size:12px;color:#666;margin:0 0 12px;">
+        Cell color: white = 0.0, green = 1.0. Bold = QuiltNet, plain = CLIP.
+        Category query counts differ across configs (see JSON files).
+      </p>
+      
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#f8f9fa;">
+          <th style="padding:8px 12px;text-align:left;font-weight:600;font-size:12px;">Category</th>
+          <th colspan="2" style="padding:8px 10px;text-align:center;background:#e74c3c;color:#fff;font-weight:600;font-size:12px;">V1: QuiltNet &nbsp;|&nbsp; CLIP</th><th colspan="2" style="padding:8px 10px;text-align:center;background:#f39c12;color:#fff;font-weight:600;font-size:12px;">V2: QuiltNet &nbsp;|&nbsp; CLIP</th><th colspan="2" style="padding:8px 10px;text-align:center;background:#27ae60;color:#fff;font-weight:600;font-size:12px;">V3: QuiltNet &nbsp;|&nbsp; CLIP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Dermatopathology</td><td style="padding:7px 10px;text-align:center;background:rgb(129,228,129);font-size:12px;"><span style="font-weight:700;">0.900</span></td><td style="padding:7px 10px;text-align:center;background:rgb(194,242,194);font-size:12px;color:#555;">0.430</td><td style="padding:7px 10px;text-align:center;background:rgb(126,227,126);font-size:12px;"><span style="font-weight:700;">0.920</span></td><td style="padding:7px 10px;text-align:center;background:rgb(180,239,180);font-size:12px;color:#555;">0.530</td><td style="padding:7px 10px;text-align:center;background:rgb(125,227,125);font-size:12px;"><span style="font-weight:700;">0.929</span></td><td style="padding:7px 10px;text-align:center;background:rgb(197,242,197);font-size:12px;color:#555;">0.414</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Gastrointestinal</td><td style="padding:7px 10px;text-align:center;background:rgb(192,241,192);font-size:12px;"><span style="font-weight:700;">0.443</span></td><td style="padding:7px 10px;text-align:center;background:rgb(219,247,219);font-size:12px;color:#555;">0.257</td><td style="padding:7px 10px;text-align:center;background:rgb(160,234,160);font-size:12px;"><span style="font-weight:700;">0.675</span></td><td style="padding:7px 10px;text-align:center;background:rgb(216,246,216);font-size:12px;color:#555;">0.275</td><td style="padding:7px 10px;text-align:center;background:rgb(151,232,151);font-size:12px;"><span style="font-weight:700;">0.740</span></td><td style="padding:7px 10px;text-align:center;background:rgb(207,244,207);font-size:12px;color:#555;">0.340</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Pulmonary</td><td style="padding:7px 10px;text-align:center;background:rgb(208,245,208);font-size:12px;"><span style="font-weight:700;">0.333</span></td><td style="padding:7px 10px;text-align:center;background:rgb(245,252,245);font-size:12px;color:#555;">0.067</td><td style="padding:7px 10px;text-align:center;background:rgb(209,245,209);font-size:12px;"><span style="font-weight:700;">0.325</span></td><td style="padding:7px 10px;text-align:center;background:rgb(232,250,232);font-size:12px;color:#555;">0.163</td><td style="padding:7px 10px;text-align:center;background:rgb(204,244,204);font-size:12px;"><span style="font-weight:700;">0.360</span></td><td style="padding:7px 10px;text-align:center;background:rgb(235,250,235);font-size:12px;color:#555;">0.140</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Gynecologic</td><td style="padding:7px 10px;text-align:center;background:rgb(224,248,224);font-size:12px;"><span style="font-weight:700;">0.220</span></td><td style="padding:7px 10px;text-align:center;background:rgb(252,254,252);font-size:12px;color:#555;">0.020</td><td style="padding:7px 10px;text-align:center;background:rgb(177,238,177);font-size:12px;"><span style="font-weight:700;">0.557</span></td><td style="padding:7px 10px;text-align:center;background:rgb(223,248,223);font-size:12px;color:#555;">0.229</td><td style="padding:7px 10px;text-align:center;background:rgb(182,239,182);font-size:12px;"><span style="font-weight:700;">0.520</span></td><td style="padding:7px 10px;text-align:center;background:rgb(218,247,218);font-size:12px;color:#555;">0.260</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Soft tissue</td><td style="padding:7px 10px;text-align:center;background:rgb(199,243,199);font-size:12px;"><span style="font-weight:700;">0.400</span></td><td style="padding:7px 10px;text-align:center;background:rgb(218,247,218);font-size:12px;color:#555;">0.260</td><td style="padding:7px 10px;text-align:center;background:rgb(192,241,192);font-size:12px;"><span style="font-weight:700;">0.450</span></td><td style="padding:7px 10px;text-align:center;background:rgb(231,250,231);font-size:12px;color:#555;">0.167</td><td style="padding:7px 10px;text-align:center;background:rgb(223,248,223);font-size:12px;"><span style="font-weight:700;">0.225</span></td><td style="padding:7px 10px;text-align:center;background:rgb(206,244,206);font-size:12px;color:#555;">0.350</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Genitourinary</td><td style="padding:7px 10px;text-align:center;background:rgb(202,243,202);font-size:12px;"><span style="font-weight:700;">0.375</span></td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;color:#555;">0.000</td><td style="padding:7px 10px;text-align:center;background:rgb(220,247,220);font-size:12px;"><span style="font-weight:700;">0.250</span></td><td style="padding:7px 10px;text-align:center;background:rgb(243,252,243);font-size:12px;color:#555;">0.083</td><td style="padding:7px 10px;text-align:center;background:rgb(206,244,206);font-size:12px;"><span style="font-weight:700;">0.350</span></td><td style="padding:7px 10px;text-align:center;background:rgb(244,252,244);font-size:12px;color:#555;">0.075</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Hematopathology</td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;"><span style="font-weight:700;">0.100</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td><td style="padding:7px 10px;text-align:center;background:rgb(213,246,213);font-size:12px;"><span style="font-weight:700;">0.300</span></td><td style="padding:7px 10px;text-align:center;background:rgb(231,250,231);font-size:12px;color:#555;">0.167</td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;"><span style="font-weight:700;">0.200</span></td><td style="padding:7px 10px;text-align:center;background:rgb(223,248,223);font-size:12px;color:#555;">0.225</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Renal</td><td style="padding:7px 10px;text-align:center;background:rgb(199,243,199);font-size:12px;"><span style="font-weight:700;">0.400</span></td><td style="padding:7px 10px;text-align:center;background:rgb(236,251,236);font-size:12px;color:#555;">0.133</td><td style="padding:7px 10px;text-align:center;background:rgb(165,235,165);font-size:12px;"><span style="font-weight:700;">0.640</span></td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;color:#555;">0.200</td><td style="padding:7px 10px;text-align:center;background:rgb(175,238,175);font-size:12px;"><span style="font-weight:700;">0.567</span></td><td style="padding:7px 10px;text-align:center;background:rgb(231,250,231);font-size:12px;color:#555;">0.167</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Bone</td><td style="padding:7px 10px;text-align:center;background:rgb(185,240,185);font-size:12px;"><span style="font-weight:700;">0.500</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td><td style="padding:7px 10px;text-align:center;background:rgb(176,238,176);font-size:12px;"><span style="font-weight:700;">0.560</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td><td style="padding:7px 10px;text-align:center;background:rgb(171,237,171);font-size:12px;"><span style="font-weight:700;">0.600</span></td><td style="padding:7px 10px;text-align:center;background:rgb(231,250,231);font-size:12px;color:#555;">0.167</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Neuropathology</td><td style="padding:7px 10px;text-align:center;background:rgb(236,251,236);font-size:12px;"><span style="font-weight:700;">0.133</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td><td style="padding:7px 10px;text-align:center;background:rgb(199,243,199);font-size:12px;"><span style="font-weight:700;">0.400</span></td><td style="padding:7px 10px;text-align:center;background:rgb(221,247,221);font-size:12px;color:#555;">0.240</td><td style="padding:7px 10px;text-align:center;background:rgb(185,240,185);font-size:12px;"><span style="font-weight:700;">0.500</span></td><td style="padding:7px 10px;text-align:center;background:rgb(245,253,245);font-size:12px;color:#555;">0.067</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Breast</td><td style="padding:7px 10px;text-align:center;background:rgb(189,240,189);font-size:12px;"><span style="font-weight:700;">0.467</span></td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;color:#555;">0.200</td><td style="padding:7px 10px;text-align:center;background:rgb(201,243,201);font-size:12px;"><span style="font-weight:700;">0.380</span></td><td style="padding:7px 10px;text-align:center;background:rgb(210,245,210);font-size:12px;color:#555;">0.320</td><td style="padding:7px 10px;text-align:center;background:rgb(171,237,171);font-size:12px;"><span style="font-weight:700;">0.600</span></td><td style="padding:7px 10px;text-align:center;background:rgb(208,245,208);font-size:12px;color:#555;">0.333</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Endocrine</td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;"><span style="font-weight:700;">0.200</span></td><td style="padding:7px 10px;text-align:center;background:rgb(213,246,213);font-size:12px;color:#555;">0.300</td><td style="padding:7px 10px;text-align:center;background:rgb(202,243,202);font-size:12px;"><span style="font-weight:700;">0.375</span></td><td style="padding:7px 10px;text-align:center;background:rgb(199,243,199);font-size:12px;color:#555;">0.400</td><td style="padding:7px 10px;text-align:center;background:rgb(220,247,220);font-size:12px;"><span style="font-weight:700;">0.250</span></td><td style="padding:7px 10px;text-align:center;background:rgb(199,243,199);font-size:12px;color:#555;">0.400</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Head and Neck</td><td style="padding:7px 10px;text-align:center;background:rgb(248,253,248);font-size:12px;"><span style="font-weight:700;">0.050</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;"><span style="font-weight:700;">0.100</span></td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;color:#555;">0.000</td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;"><span style="font-weight:700;">0.100</span></td><td style="padding:7px 10px;text-align:center;background:rgb(248,253,248);font-size:12px;color:#555;">0.050</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Cardiac</td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;"><span style="font-weight:700;">0.200</span></td><td style="padding:7px 10px;text-align:center;background:rgb(248,253,248);font-size:12px;color:#555;">0.050</td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;"><span style="font-weight:700;">0.200</span></td><td style="padding:7px 10px;text-align:center;background:rgb(251,254,251);font-size:12px;color:#555;">0.025</td><td style="padding:7px 10px;text-align:center;background:rgb(178,238,178);font-size:12px;"><span style="font-weight:700;">0.550</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Hepatopathology</td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;"><span style="font-weight:700;">0.100</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td><td style="padding:7px 10px;text-align:center;background:rgb(248,253,248);font-size:12px;"><span style="font-weight:700;">0.050</span></td><td style="padding:7px 10px;text-align:center;background:rgb(248,253,248);font-size:12px;color:#555;">0.050</td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;"><span style="font-weight:700;">0.100</span></td><td style="padding:7px 10px;text-align:center;background:rgb(248,253,248);font-size:12px;color:#555;">0.050</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Ophthalmic</td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;"><span style="font-weight:700;">0.000</span></td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;color:#555;">0.000</td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;"><span style="font-weight:700;">0.200</span></td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;color:#555;">0.000</td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;"><span style="font-weight:700;">0.000</span></td><td style="padding:7px 10px;text-align:center;background:rgb(241,252,241);font-size:12px;color:#555;">0.100</td></tr><tr><td style="padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap;">Cytopathology</td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;"><span style="font-weight:700;">0.200</span></td><td style="padding:7px 10px;text-align:center;background:rgb(255,255,255);font-size:12px;color:#555;">0.000</td><td style="padding:7px 10px;text-align:center;background:rgb(185,240,185);font-size:12px;"><span style="font-weight:700;">0.500</span></td><td style="padding:7px 10px;text-align:center;background:rgb(234,250,234);font-size:12px;color:#555;">0.150</td><td style="padding:7px 10px;text-align:center;background:rgb(199,243,199);font-size:12px;"><span style="font-weight:700;">0.400</span></td><td style="padding:7px 10px;text-align:center;background:rgb(227,249,227);font-size:12px;color:#555;">0.200</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Improvement highlights -->
+    <div class="card">
+      <h2 style="margin-top:0;">Key Improvements: V1 &rarr; V3 (QuiltNet)</h2>
+      
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+      <div>
+        <h4 style="margin:0 0 12px;color:#27ae60;">Top Gains (V1 &#8594; V3, QuiltNet)</h4>
+        
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Neuropathology</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.133</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#27ae60;">0.500</span>
+            <span style="background:#27ae60;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">+0.367</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Cardiac</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.200</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#27ae60;">0.550</span>
+            <span style="background:#27ae60;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">+0.350</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Gynecologic</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.220</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#27ae60;">0.520</span>
+            <span style="background:#27ae60;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">+0.300</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Gastrointestinal</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.443</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#27ae60;">0.740</span>
+            <span style="background:#27ae60;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">+0.297</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Cytopathology</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.200</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#27ae60;">0.400</span>
+            <span style="background:#27ae60;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">+0.200</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h4 style="margin:0 0 12px;color:#e74c3c;">Regressions (V1 &#8594; V3, QuiltNet)</h4>
+        
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Genitourinary</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.375</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#e74c3c;">0.350</span>
+            <span style="background:#e74c3c;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">-0.025</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #dee2e6;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;">Soft tissue</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+            <span style="font-size:11px;color:#888;">V1: 0.400</span>
+            <span style="font-size:16px;color:#888;">&#8594;</span>
+            <span style="font-size:13px;font-weight:700;color:#e74c3c;">0.225</span>
+            <span style="background:#e74c3c;color:#fff;padding:2px 7px;border-radius:10px;
+                         font-size:11px;font-weight:700;">-0.175</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- Methodology -->
+    <div class="card">
+      <h2 style="margin-top:0;">Methodology</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tr style="background:#343a40;color:#fff;">
+          <th style="padding:8px 12px;text-align:left;">Aspect</th>
+          <th style="padding:8px 12px;text-align:left;">V1 Baseline</th>
+          <th style="padding:8px 12px;text-align:left;">V2 Better Queries</th>
+          <th style="padding:8px 12px;text-align:left;">V3 RRF Ensemble</th>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;font-weight:600;">Query set</td>
+          <td style="padding:8px 12px;">63 broad queries</td>
+          <td style="padding:8px 12px;">90 domain-specific queries</td>
+          <td style="padding:8px 12px;">56 concepts &times; 3 variants = 168 FAISS searches</td>
+        </tr>
+        <tr style="background:#f8f9fa;">
+          <td style="padding:8px 12px;font-weight:600;">Unknown filter</td>
+          <td style="padding:8px 12px;">No (33% unknowns pollute top-K)</td>
+          <td style="padding:8px 12px;">Yes (top-K&times;3, filter, take top-K)</td>
+          <td style="padding:8px 12px;">Yes (same approach)</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;font-weight:600;">Fusion</td>
+          <td style="padding:8px 12px;">Single query, no fusion</td>
+          <td style="padding:8px 12px;">Single query, no fusion</td>
+          <td style="padding:8px 12px;">RRF: score = &sum; 1/(60 + rank<sub>i</sub>)</td>
+        </tr>
+        <tr style="background:#f8f9fa;">
+          <td style="padding:8px 12px;font-weight:600;">Encoders</td>
+          <td style="padding:8px 12px;" colspan="3">
+            QuiltNet-B-32 (wisdomik/QuiltNet-B-32 via open_clip, histopathology fine-tuned) &nbsp;|&nbsp;
+            CLIP ViT-B/32 (openai/clip-vit-base-patch32 via HuggingFace)
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;font-weight:600;">Ground truth</td>
+          <td style="padding:8px 12px;" colspan="3">
+            Binary relevance: result is relevant if <code>pathology</code> label &isin; expected category set.
+            Precision@K = |relevant &cap; top-K| / K.
+          </td>
+        </tr>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>
